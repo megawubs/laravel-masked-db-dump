@@ -64,24 +64,24 @@ class LaravelMaskedDump
         $iterator = $this->rowsOf($queryBuilder, $table);
 
         $rows = [];
-        $rowsSize = 0;
+        $chunkBytes = 0;
         foreach ($iterator as $row) {
             $insertRow = $this->transformResultForInsert((array)$row, $table, $queryBuilder);
-            $rowSize = $this->sizeOfRow($insertRow, $queryBuilder);
+            $insertRowBytes = $this->bytesOfRow($insertRow, $queryBuilder);
 
-            if ($rows !== [] && $this->exceedsMaxStatementSize($table, $rowsSize + $rowSize)) {
+            if ($rows !== [] && $this->exceedsMaxStatementBytes($table, $chunkBytes + $insertRowBytes)) {
                 yield $this->compileRawInsert($rows, $queryBuilder);
                 $rows = [];
-                $rowsSize = 0;
+                $chunkBytes = 0;
             }
 
             $rows[] = $insertRow;
-            $rowsSize += $rowSize;
+            $chunkBytes += $insertRowBytes;
 
             if (count($rows) >= $table->getChunkSize()) {
                 yield $this->compileRawInsert($rows, $queryBuilder);
                 $rows = [];
-                $rowsSize = 0;
+                $chunkBytes = 0;
             }
         }
 
@@ -96,20 +96,20 @@ class LaravelMaskedDump
      * The number of bytes the row adds to the values of an insert statement: its escaped values,
      * the ", " between them and the "(" and "), " around them.
      */
-    private function sizeOfRow(array $insertRow, Builder $queryBuilder): int
+    private function bytesOfRow(array $insertRow, Builder $queryBuilder): int
     {
-        $valuesSize = array_sum(array_map(
+        $valuesBytes = array_sum(array_map(
             fn (Expression $value): int => strlen((string) $value->getValue($queryBuilder->grammar)),
             $insertRow
         ));
 
-        return $valuesSize + 2 * count($insertRow) + 2;
+        return $valuesBytes + 2 * count($insertRow) + 2;
     }
 
-    private function exceedsMaxStatementSize(TableDefinition $table, int $rowsSize): bool
+    private function exceedsMaxStatementBytes(TableDefinition $table, int $chunkBytes): bool
     {
-        return $table->getMaxStatementSize() !== null
-            && $rowsSize > $table->getMaxStatementSize();
+        return $table->getMaxStatementBytes() !== null
+            && $chunkBytes > $table->getMaxStatementBytes();
     }
 
     private function compileRawInsert(array $rows, Builder $queryBuilder): string

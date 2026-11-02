@@ -17,7 +17,7 @@ class TableDefinition
     protected $columns = [];
     protected $chunkSize = 0;
     protected $queryChunkSize = 2000;
-    protected ?int $maxStatementSize = null;
+    protected ?int $maxStatementBytes = null;
 
     protected ?array $primary = null;
 
@@ -49,7 +49,7 @@ class TableDefinition
      */
     public function limitStatementSizeTo(int $bytes)
     {
-        $this->maxStatementSize = $bytes;
+        $this->maxStatementBytes = $bytes;
 
         return $this;
     }
@@ -105,9 +105,9 @@ class TableDefinition
         return $this->chunkSize;
     }
 
-    public function getMaxStatementSize(): ?int
+    public function getMaxStatementBytes(): ?int
     {
-        return $this->maxStatementSize;
+        return $this->maxStatementBytes;
     }
 
     public function getQueryChunkSize()
