@@ -270,6 +270,40 @@ class DumperTest extends TestCase
     }
 
     #[Test]
+    public function it_starts_a_new_insert_statement_before_the_statement_size_limit_is_exceeded()
+    {
+        $this->loadLaravelMigrations();
+
+        DB::table('users')
+            ->insert(['name' => 'Marcel1', 'email' => 'marcel1@beyondco.de', 'password' => 'test',
+                'created_at' => '2021-01-01 00:00:00', 'updated_at' => '2021-01-01 00:00:00',
+            ]);
+        DB::table('users')
+            ->insert(['name' => 'Marcel2', 'email' => 'marcel2@beyondco.de', 'password' => 'test',
+                'created_at' => '2021-01-01 00:00:00', 'updated_at' => '2021-01-01 00:00:00',
+            ]);
+        DB::table('users')
+            ->insert(['name' => 'Marcel3', 'email' => 'marcel3@beyondco.de', 'password' => 'test',
+                'created_at' => '2021-01-01 00:00:00', 'updated_at' => '2021-01-01 00:00:00',
+            ]);
+
+        $outputFile = base_path('test.sql');
+
+        // The values of one of these rows take 105 bytes, so two rows fit in 250 bytes and three do not
+        $this->app['config']['masked-dump.default'] = DumpSchema::define()
+            ->allTables()
+            ->table('users', function($table) {
+                return $table->outputInChunksOf(2000)->limitStatementSizeTo(250);
+            });
+
+        $this->artisan('db:masked-dump', [
+            'output' => $outputFile
+        ]);
+
+        $this->assertMatchesTextSnapshot(file_get_contents($outputFile));
+    }
+
+    #[Test]
     public function it_can_include_individual_unmodified_tables()
     {
         $this->loadLaravelMigrations();

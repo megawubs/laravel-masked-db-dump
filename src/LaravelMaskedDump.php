@@ -64,12 +64,24 @@ class LaravelMaskedDump
         $iterator = $this->rowsOf($queryBuilder, $table);
 
         $rows = [];
+        $rowsSize = 0;
         foreach ($iterator as $row) {
-            $rows[] = $this->transformResultForInsert((array)$row, $table, $queryBuilder);
+            $insertRow = $this->transformResultForInsert((array)$row, $table, $queryBuilder);
+            $rowSize = $this->sizeOfRow($insertRow, $queryBuilder);
+
+            if ($rows !== [] && $this->exceedsMaxStatementSize($table, $rowsSize + $rowSize)) {
+                yield $this->compileRawInsert($rows, $queryBuilder);
+                $rows = [];
+                $rowsSize = 0;
+            }
+
+            $rows[] = $insertRow;
+            $rowsSize += $rowSize;
 
             if (count($rows) >= $table->getChunkSize()) {
                 yield $this->compileRawInsert($rows, $queryBuilder);
                 $rows = [];
+                $rowsSize = 0;
             }
         }
 
@@ -78,6 +90,26 @@ class LaravelMaskedDump
         }
 
         yield $this->compileRawInsert($rows, $queryBuilder);
+    }
+
+    /**
+     * The number of bytes the row adds to the values of an insert statement: its escaped values,
+     * the ", " between them and the "(" and "), " around them.
+     */
+    private function sizeOfRow(array $insertRow, Builder $queryBuilder): int
+    {
+        $valuesSize = array_sum(array_map(
+            fn (Expression $value): int => strlen((string) $value->getValue($queryBuilder->grammar)),
+            $insertRow
+        ));
+
+        return $valuesSize + 2 * count($insertRow) + 2;
+    }
+
+    private function exceedsMaxStatementSize(TableDefinition $table, int $rowsSize): bool
+    {
+        return $table->getMaxStatementSize() !== null
+            && $rowsSize > $table->getMaxStatementSize();
     }
 
     private function compileRawInsert(array $rows, Builder $queryBuilder): string

@@ -17,6 +17,7 @@ class TableDefinition
     protected $columns = [];
     protected $chunkSize = 0;
     protected $queryChunkSize = 2000;
+    protected ?int $maxStatementSize = null;
 
     protected ?array $primary = null;
 
@@ -37,6 +38,18 @@ class TableDefinition
     public function outputInChunksOf(int $chunkSize)
     {
         $this->chunkSize = $chunkSize;
+
+        return $this;
+    }
+
+    /**
+     * Start a new insert statement before its values exceed the given number of bytes,
+     * so every statement fits within the max_allowed_packet of the server that imports the dump.
+     * A single row larger than the limit still gets a statement of its own.
+     */
+    public function limitStatementSizeTo(int $bytes)
+    {
+        $this->maxStatementSize = $bytes;
 
         return $this;
     }
@@ -90,6 +103,11 @@ class TableDefinition
     public function getChunkSize()
     {
         return $this->chunkSize;
+    }
+
+    public function getMaxStatementSize(): ?int
+    {
+        return $this->maxStatementSize;
     }
 
     public function getQueryChunkSize()
